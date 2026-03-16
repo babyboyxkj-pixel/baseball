@@ -168,7 +168,9 @@ el('btnActiveOff').addEventListener('click',()=>setActiveState(false));
 
 async function loadList(){
   el('playerList').innerHTML='';el('listHint').textContent='불러오는 중...';
-  const{data,error}=await client.from('baseball_players').select('id,name,jersey_number,grade,primary_position,throws,bats,height_cm,weight_kg,is_active,tags').order('is_active',{ascending:false}).order('grade',{ascending:true}).order('jersey_number',{ascending:true,nullsFirst:false}).order('name',{ascending:true});
+  const{data:{user}}=await client.auth.getUser();
+  if(!user){el('listHint').textContent='로그인이 필요해요.';return;}
+  const{data,error}=await client.from('baseball_players').select('id,name,jersey_number,grade,primary_position,throws,bats,height_cm,weight_kg,is_active,tags').eq('owner_user_id',user.id).order('is_active',{ascending:false}).order('grade',{ascending:true}).order('jersey_number',{ascending:true,nullsFirst:false}).order('name',{ascending:true});
   if(error){el('listHint').textContent='불러오기 실패: '+error.message;return;}
   if(!data||!data.length){el('listHint').textContent='등록된 선수가 없어요. + 버튼으로 추가하세요.';return;}
   el('listHint').textContent='';
