@@ -160,48 +160,7 @@ body {
   margin: 24px 0 12px;
 }
 
-/* ── 알림 카드 ── */
-.alert-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 16px 18px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 16px;
-  cursor: pointer;
-  transition: border-color .15s;
-}
-.alert-card:hover { border-color: var(--border2); }
-.alert-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: var(--brand-dim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  flex-shrink: 0;
-}
-.alert-icon.done { background: rgba(74,222,128,.12); }
-.alert-icon.warn { background: rgba(255,77,77,.12); }
-.alert-body { flex: 1; min-width: 0; }
-.alert-body .at { font-size: 13px; font-weight: 700; }
-.alert-body .ad { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.alert-pill {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: var(--brand-dim);
-  color: var(--brand);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.alert-pill.done { background: var(--win-bg); color: var(--win); }
-.alert-pill.warn { background: var(--loss-bg); color: var(--loss); }
+
 
 /* ── 통계 그리드 ── */
 .stats-grid {
@@ -384,15 +343,7 @@ body {
     </div>
   </div>
 
-  <!-- 입력 알림 -->
-  <div class="alert-card" id="alertCard" onclick="goProtected('records.html')">
-    <div class="alert-icon" id="alertIcon">📋</div>
-    <div class="alert-body">
-      <div class="at" id="alertTitle">오늘의 기록 알림</div>
-      <div class="ad" id="alertDesc">로그인하면 입력 현황을 확인할 수 있어요.</div>
-    </div>
-    <div class="alert-pill" id="alertPill">게스트</div>
-  </div>
+
 
   <!-- 올해/이번달 요약 -->
   <div class="section-title">시즌 요약</div>
@@ -408,6 +359,15 @@ body {
       <div class="stat-sub" id="monthLabel">로그인 후 표시</div>
     </div>
   </div>
+
+  <!-- 최근 경기 -->
+  <div class="section-title">최근 경기</div>
+  <div id="recentHint" class="empty" style="display:none">
+    <div class="empty-icon">⚾</div>
+    로그인하면 최근 경기 목록을<br>확인할 수 있어요.
+  </div>
+  <div class="recent-list" id="recentList"></div>
+  <button class="view-all" id="btnViewAll" onclick="goProtected('report.html')" style="display:none">전체 경기 보기</button>
 
   <!-- 빠른 메뉴 -->
   <div class="section-title">바로가기</div>
@@ -446,15 +406,6 @@ body {
     </div>
   </div>
 
-  <!-- 최근 경기 -->
-  <div class="section-title">최근 경기</div>
-  <div id="recentHint" class="empty" style="display:none">
-    <div class="empty-icon">⚾</div>
-    로그인하면 최근 경기 목록을<br>확인할 수 있어요.
-  </div>
-  <div class="recent-list" id="recentList"></div>
-  <button class="view-all" id="btnViewAll" onclick="goProtected('report.html')" style="display:none">전체 경기 보기</button>
-
 </div>
 
 <script>
@@ -466,7 +417,7 @@ let currentSession = null;
 function badgeClass(r){ return r==='W'?'W':r==='L'?'L':'D'; }
 function todayYM(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
 function rangeFromYM(ym){ const [y,m]=ym.split('-').map(Number); const s=new Date(y,m-1,1),e=new Date(y,m,1); const i=d=>d.toISOString().slice(0,10); return {start:i(s),end:i(e)}; }
-function isoDaysAgo(days){ const d=new Date(); d.setDate(d.getDate()-days); return d.toISOString().slice(0,10); }
+
 
 function goProtected(path){
   if(!currentSession){ location.href=`auth.html?next=${encodeURIComponent(path)}`; return; }
@@ -500,42 +451,7 @@ function renderGuestHome(){
   el('btnViewAll').style.display='none';
 }
 
-async function loadInputAlert(){
-  const since=isoDaysAgo(7);
-  const {data:games,error}=await client.from('baseball_games').select('id,game_date,opponent').gte('game_date',since).order('game_date',{ascending:false});
-  if(error){ el('alertDesc').textContent='알림 불러오기 실패: '+error.message; return; }
-  const list=games||[];
-  if(!list.length){
-    el('alertIcon').textContent='✅';
-    el('alertIcon').className='alert-icon done';
-    el('alertTitle').textContent='최근 경기 없음';
-    el('alertDesc').textContent='최근 7일 내 등록된 경기가 없어요.';
-    el('alertPill').textContent='OK';
-    el('alertPill').className='alert-pill done';
-    return;
-  }
-  const gameIds=list.map(g=>g.id);
-  const {data:recs,error:rErr}=await client.from('baseball_game_player_records').select('game_id').in('game_id',gameIds);
-  if(rErr){ el('alertDesc').textContent='집계 실패: '+rErr.message; return; }
-  const hasRecord=new Set((recs||[]).map(r=>r.game_id));
-  const missing=list.filter(g=>!hasRecord.has(g.id));
-  if(!missing.length){
-    el('alertIcon').textContent='✅';
-    el('alertIcon').className='alert-icon done';
-    el('alertTitle').textContent='기록 입력 완료';
-    el('alertDesc').textContent='최근 7일 모든 경기 기록이 완료됐어요. 👍';
-    el('alertPill').textContent='완료';
-    el('alertPill').className='alert-pill done';
-  } else {
-    const ex=missing[0];
-    el('alertIcon').textContent='⚠️';
-    el('alertIcon').className='alert-icon warn';
-    el('alertTitle').textContent=`미입력 경기 ${missing.length}개`;
-    el('alertDesc').textContent=`${ex.game_date} vs ${ex.opponent} 외 ${missing.length-1}경기`;
-    el('alertPill').textContent='필요';
-    el('alertPill').className='alert-pill warn';
-  }
-}
+
 
 async function loadYearlySummary(){
   const year=new Date().getFullYear();
@@ -600,7 +516,7 @@ async function init(){
   currentSession=await getOptionalSession();
   renderAuthButtons(currentSession);
   if(!currentSession){ renderGuestHome(); return; }
-  await Promise.all([loadInputAlert(), loadYearlySummary(), loadMonthlySummary(), loadRecentGames()]);
+  await Promise.all([loadYearlySummary(), loadMonthlySummary(), loadRecentGames()]);
 }
 init();
 </script>
