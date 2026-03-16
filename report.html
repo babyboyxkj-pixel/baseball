@@ -176,7 +176,7 @@ select option{background:var(--panel)}
 const client=window.sb;
 async function requireLogin(){const{data,error}=await client.auth.getSession();if(error||!data?.session){location.href=`auth.html?next=${encodeURIComponent(location.pathname.split('/').pop()+location.search)}`;return null;}return data.session;}
 const el=(id)=>document.getElementById(id);
-let currentGameId=null,currentFilter={tournament:null},gamesCache=[];
+let currentGameId=null,currentFilter={tournament:null},gamesCache=[],isAdmin=false,myUserId=null,myPlayerId=null;
 function show(viewId,push=true){['viewList','viewDetail'].forEach(v=>el(v).classList.add('hidden'));el(viewId).classList.remove('hidden');if(push)history.pushState({view:viewId,gameId:currentGameId,tournament:currentFilter.tournament},'',viewId==='viewDetail'?`report.html?game=${currentGameId}`:'report.html');}
 function safe(v,fb='-'){return(v===null||v===undefined||v==='')? fb:v;}
 function num(v){return Number.isFinite(Number(v))?Number(v):0;}
@@ -221,6 +221,7 @@ async function openDetail(gameId,push=true){
   el('gInnings').textContent=safe(g.innings)+'이닝';el('gWeather').textContent=safe(g.weather);
   el('gTeamStats').textContent=`${num(g.our_hits)}안타 / ${num(g.our_errors)}실책 / ${num(g.our_hr)}홈런`;
   el('btnOpenInput').onclick=()=>location.href=`createGame.html?game=${gameId}`;
+  el('btnOpenInput').style.display=isAdmin?'block':'none';
   const{data:records}=await client.from('baseball_game_player_records').select('*,baseball_players(*)').eq('game_id',gameId).order('batting_order');
   el('recordsHint').textContent=records?.length?'':'기록된 선수가 없습니다.';
   records?.forEach(rec=>{
@@ -228,7 +229,13 @@ async function openDetail(gameId,push=true){
     const item=document.createElement('div');item.className='player-card';
     const pnum=(p.jersey_number??'')!==''?p.jersey_number:'-';
     item.innerHTML=`<div class="player-num">${pnum}</div><div class="player-info"><div class="player-name">${p.name} <span style="color:var(--muted);font-size:12px">(${p.grade||'-'}학년)</span></div><div class="player-meta">${rec.batting_order||'-'}번 · ${rec.position||'-'} | ${num(rec.ab)}타 ${num(rec.h)}안 ${num(rec.rbi)}점 / ${num(rec.ip)}이닝 ${num(rec.pk)}K</div></div><div class="starter-pill ${rec.is_starter?'on':'off'}">${rec.is_starter?'선발':'교체'}</div>`;
-    item.onclick=()=>openPlayerModal(g,rec);el('recordsList').appendChild(item);
+    item.onclick=()=>{
+    if(rec.player_id!==myPlayerId){
+      alert('본인 기록만 확인할 수 있어요.');return;
+    }
+    openPlayerModal(g,rec);
+  };
+  el('recordsList').appendChild(item);
   });
 }
 
@@ -267,6 +274,15 @@ window.onpopstate=(e)=>{if(!e.state||e.state.view==='viewList'){show('viewList',
 
 (async function init(){
   const session=await requireLogin();if(!session)return;
+  // 내 프로필 로드
+  const {data:{user}}=await client.auth.getUser();
+  if(user){
+    myUserId=user.id;
+    const {data:profile}=await client.from('baseball_profiles').select('role').eq('id',user.id).single();
+    if(profile) isAdmin=profile.role==='admin';
+    const {data:player}=await client.from('baseball_players').select('id').eq('owner_user_id',user.id).maybeSingle();
+    if(player) myPlayerId=player.id;
+  }
   await loadTournaments();
   const gid=new URLSearchParams(location.search).get('game');
   if(gid)openDetail(Number(gid),false);else{show('viewList',false);loadGameList();}
