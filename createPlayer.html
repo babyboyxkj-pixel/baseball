@@ -183,7 +183,18 @@ async function loadList(){
 
 function resetForm(){el('name').value='';el('jersey').value='';el('grade').value='';el('birthYear').value='';el('primaryPos').value='';el('throws').value='우';el('bats').value='우';el('height').value='';el('weight').value='';el('secondaryPos').value='';el('tags').value='';el('photoUrl').value='';syncChipsFromInput();setActiveState(true);setMsg('');}
 
-function enterCreate(){mode='create';editingId=null;el('formTitle').textContent='선수 신규 등록';el('formSub').textContent='기본정보 + 추가정보';el('btnDelete').classList.add('hidden');resetForm();showForm();}
+// 1계정 1선수 제한
+async function enterCreate(){
+  const{data:{user}}=await client.auth.getUser();
+  if(user){
+    const{data:existing}=await client.from('baseball_players').select('id').eq('owner_user_id',user.id).maybeSingle();
+    if(existing){
+      alert('이미 등록된 선수가 있어요. 기존 선수를 선택해 수정하세요.');
+      return;
+    }
+  }
+  mode='create';editingId=null;el('formTitle').textContent='선수 신규 등록';el('formSub').textContent='기본정보 + 추가정보';el('btnDelete').classList.add('hidden');resetForm();showForm();
+}
 
 async function openEdit(id){
   mode='edit';editingId=id;el('formTitle').textContent='선수 수정';el('formSub').textContent=`ID #${id}`;el('btnDelete').classList.remove('hidden');showForm();setMsg('불러오는 중...');
