@@ -545,7 +545,6 @@ async function loadYearlySummary(){
   const list=games||[];
   let w=0,l=0,d=0;
   list.forEach(g=>{ if(g.result==='W')w++; else if(g.result==='L')l++; else d++; });
-  el('yGames').textContent=list.length;
   el('yWLD').textContent=`${w}·${l}·${d}`;
   el('yearLabel').textContent=`${year}년 기준`;
 }
