@@ -274,14 +274,16 @@ window.onpopstate=(e)=>{if(!e.state||e.state.view==='viewList'){show('viewList',
 
 (async function init(){
   const session=await requireLogin();if(!session)return;
-  // 내 프로필 로드
+  // 내 프로필 로드 (병렬)
   const {data:{user}}=await client.auth.getUser();
   if(user){
     myUserId=user.id;
-    const {data:profile}=await client.from('baseball_profiles').select('role').eq('id',user.id).single();
-    if(profile) isAdmin=profile.role==='admin';
-    const {data:player}=await client.from('baseball_players').select('id').eq('owner_user_id',user.id).maybeSingle();
-    if(player) myPlayerId=player.id;
+    const [profileRes,playerRes]=await Promise.all([
+      client.from('baseball_profiles').select('role').eq('id',user.id).single(),
+      client.from('baseball_players').select('id').eq('owner_user_id',user.id).maybeSingle()
+    ]);
+    if(profileRes.data) isAdmin=profileRes.data.role==='admin';
+    if(playerRes.data) myPlayerId=playerRes.data.id;
   }
   await loadTournaments();
   const gid=new URLSearchParams(location.search).get('game');
