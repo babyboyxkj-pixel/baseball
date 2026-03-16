@@ -41,8 +41,8 @@
     </div>
 
     <div id="loginView">
-      <label>이메일</label>
-      <input id="loginEmail" type="email" placeholder="example@email.com" />
+      <label>아이디</label>
+      <input id="loginUsername" placeholder="아이디 입력" autocomplete="username" />
       <label>비밀번호</label>
       <input id="loginPassword" type="password" placeholder="비밀번호" />
       <button class="btn" id="btnLogin">로그인</button>
@@ -50,14 +50,14 @@
     </div>
 
     <div id="signupView" class="hidden">
+      <label>아이디</label>
+      <input id="signupUsername" placeholder="영문+숫자 (예: kim2013)" autocomplete="username" />
+      <label>비밀번호</label>
+      <input id="signupPassword" type="password" placeholder="비밀번호(6자 이상)" />
       <label>보호자/회원 이름</label>
       <input id="displayName" placeholder="예: 김민준 어머니" />
       <label>학교 선택</label>
       <select id="schoolSel"></select>
-      <label>이메일</label>
-      <input id="signupEmail" type="email" placeholder="example@email.com" />
-      <label>비밀번호</label>
-      <input id="signupPassword" type="password" placeholder="비밀번호(6자 이상)" />
 
       <label>선수 이름</label>
       <input id="playerName" placeholder="예: 김민준" />
@@ -98,8 +98,10 @@
   </div>
 </div>
 <script>
-const client = window.sb;
 const el = (id) => document.getElementById(id);
+const FAKE_DOMAIN = '@baseball.app';
+
+function toEmail(username){ return username.trim().toLowerCase() + FAKE_DOMAIN; }
 
 function showTab(mode){
   const login = mode === 'login';
@@ -113,10 +115,7 @@ async function loadSchools(){
   const { data, error } = await sb.from('baseball_schools').select('id,name').order('name');
   const sel = el('schoolSel');
   sel.innerHTML = '<option value="">학교 선택</option>';
-  if (error) {
-    el('signupMsg').textContent = '학교 목록을 불러오지 못했어요: ' + error.message;
-    return;
-  }
+  if (error) { el('signupMsg').textContent = '학교 목록을 불러오지 못했어요: ' + error.message; return; }
   (data || []).forEach(s => {
     const opt = document.createElement('option');
     opt.value = s.id;
@@ -135,23 +134,28 @@ el('tabSignup').onclick = () => showTab('signup');
 
 el('btnLogin').onclick = async () => {
   el('loginMsg').textContent = '로그인 중...';
+  const username = el('loginUsername').value.trim();
+  if (!username) { el('loginMsg').textContent = '아이디를 입력해주세요.'; return; }
+
   const { error } = await sb.auth.signInWithPassword({
-    email: el('loginEmail').value.trim(),
+    email: toEmail(username),
     password: el('loginPassword').value,
   });
-  if (error) {
-    el('loginMsg').textContent = error.message;
-    return;
-  }
+  if (error) { el('loginMsg').textContent = '아이디 또는 비밀번호가 틀렸어요.'; return; }
   location.href = nextUrl();
 };
 
 el('btnSignup').onclick = async () => {
   el('signupMsg').textContent = '회원가입 중...';
+  const username = el('signupUsername').value.trim();
   const schoolId = Number(el('schoolSel').value);
+
+  if (!username) { el('signupMsg').textContent = '아이디를 입력해주세요.'; return; }
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) { el('signupMsg').textContent = '아이디는 영문 소문자, 숫자, _ 만 사용 가능하고 3~20자여야 해요.'; return; }
   if (!schoolId) { el('signupMsg').textContent = '학교를 선택해주세요.'; return; }
 
   const payload = {
+    username,
     display_name: el('displayName').value.trim(),
     school_id: schoolId,
     player_name: el('playerName').value.trim(),
@@ -169,7 +173,7 @@ el('btnSignup').onclick = async () => {
   }
 
   const { data, error } = await sb.auth.signUp({
-    email: el('signupEmail').value.trim(),
+    email: toEmail(username),
     password: el('signupPassword').value,
     options: { data: payload }
   });
@@ -184,7 +188,7 @@ el('btnSignup').onclick = async () => {
     return;
   }
 
-  el('signupMsg').textContent = '회원가입이 완료됐어요. 이메일 인증이 켜져 있다면 메일 확인 후 로그인해주세요.';
+  el('signupMsg').textContent = '회원가입이 완료됐어요!';
 };
 
 (async function init(){
